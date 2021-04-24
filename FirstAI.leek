@@ -1,0 +1,168 @@
+/** Exporté le 24/04/2021 à 16:25:09 **/
+
+/** AI **/
+
+// Global variables
+global wasStarted = false;
+global firstWeapon = WEAPON_MACHINE_GUN;
+global secondWeapon = WEAPON_PISTOL;
+global myLeek = getEntity();
+global totalLife = getTotalLife();
+
+// Compute distance to given leek
+function getDistanceFrom(leek)
+{
+	var myCell = getCell();
+	var hisCell = getCell(leek);
+	return getCellDistance(myCell, hisCell);
+}
+
+// Move near a Leek
+function moveNearLeek(leek)
+{
+	
+	var distance = getDistanceFrom(leek);
+	if (distance < 1)
+	{
+		debugW("Already near leek: " + getName(leek))
+	}
+	
+	var usedMp = 0;
+	while (distance > 1 and getMP() > 0)
+	{
+		usedMp += moveToward(leek);
+		distance = getDistanceFrom(leek);
+		debugW("Moving forward leek: " + getName(leek))
+	}
+	
+	debugW("Distance remaining form leek: " + distance + " cells");
+	debugW("Mp used: " + usedMp);
+	return usedMp;
+}
+
+// Try to use a given weapon
+function tryUseWeapon(weapon, enemy)
+{
+	var tp = getTP();
+	var cost = getWeaponCost(weapon);
+
+	// Check if the leek can use the weapon and if the leek has enough TP to equip the weapon and use it
+	if (!canUseWeapon(weapon, enemy) or tp < cost + (getWeapon() != weapon ? 1 : 0))
+	{
+		debugW("Can't use weapon: " + getWeaponName(weapon));
+		return	0;
+	}
+
+	var usedTp = 0;
+
+	// Equip the weapon if necessary
+	if (getWeapon() != weapon)
+	{
+		setWeapon(weapon);
+		usedTp += 1;
+		tp -= 1;
+	}
+
+
+	// Use the weapon
+	while(tp >= cost)
+	{
+		useWeapon(enemy);
+		usedTp += cost;
+		tp -= cost;
+		debugW("Firing on enemy with weapon: " + getWeaponName(weapon));
+	}
+
+	debugW("Tp used: " + usedTp);
+	return usedTp;
+}
+
+// Try to use a given weapon
+function tryUseChip(chip, leek)
+{
+	var tp = getTP();
+	var cost = getChipCost(chip);
+
+	// Check if the leek can use the chip
+	if (!canUseChip(chip, leek) or tp < cost)
+	{
+		debugW("Can't use chip: " + getChipName(chip));
+		return 0;
+	}
+	
+	var usedTp = 0;
+	
+	// Use the chip
+	while (getCooldown(chip) == 0 and tp >= cost)
+	{
+		useChip(chip, leek);
+		usedTp += cost;
+		tp -= cost;
+		debugW("Using chip on leek: " + getChipName(chip));
+	}
+
+	debugW("Tp used: " + usedTp);
+	return usedTp;
+}
+
+
+// Main of the AI
+function main()
+{
+	// Talk if the match was not started
+	if (!wasStarted)
+	{
+		say("I'm going to kick your ass !");
+		wasStarted = true;
+	}
+
+	
+	debugW("--------------------");
+	debugW("Turn nb: " + getTurn());
+
+	// Target enemy
+	var enemy = getNearestEnemy();
+	debugW("Targeting leek : " + getName(enemy));
+
+	// Move near enemy
+	moveNearLeek(enemy);
+
+	var totalUsedTp = 0;
+	if (getCooldown(CHIP_MOTIVATION) == 0)
+	{
+		// Use Motivation
+		totalUsedTp += tryUseChip(CHIP_MOTIVATION, myLeek);
+	}
+	if (getLife() < totalLife * 0.75)
+	{
+		// Use bandage
+		totalUsedTp += tryUseChip(CHIP_BANDAGE, myLeek);
+	}
+	if (getCooldown(CHIP_PROTEIN) == 0)
+	{
+		// Use protein
+		totalUsedTp += tryUseChip(CHIP_PROTEIN, myLeek);
+	}
+	if (getCooldown(CHIP_HELMET) == 0)
+	{
+		// Use helmet
+		totalUsedTp += tryUseChip(CHIP_HELMET, myLeek);
+	}
+
+
+	// Attack
+	totalUsedTp += tryUseWeapon(firstWeapon, enemy);
+	totalUsedTp += tryUseWeapon(secondWeapon, enemy);
+	totalUsedTp += tryUseChip(CHIP_PEBBLE, enemy);
+
+	// Equip first weapon if there is some available TP
+	if (getTP() > 0)
+	{
+		setWeapon(firstWeapon);
+		totalUsedTp += 1;
+	}
+	
+	debugW("Total used tp : " + totalUsedTp);
+}
+
+main()
